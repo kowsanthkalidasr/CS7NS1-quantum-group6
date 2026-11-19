@@ -84,7 +84,7 @@ def run_one_hop(params, sim_time_ms, seed) -> dict:
     """
     link = make_links(params,which="one_hop")
     sim = Simulator(links=link, t2=math.inf,q_swap=1,f_swap=1,purification_allowed=True,seed=seed)
-    result = sim.run(sim_time_ms,policy=None)
+    sim.run(sim_time_ms,policy=None)
     
     delivered_pairs = []
     for p in sim.state.pairs.get(0,[]):
