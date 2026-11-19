@@ -86,19 +86,24 @@ def run_one_hop(params, sim_time_ms, seed) -> dict:
     sim = Simulator(links=link, t2=math.inf,q_swap=1,f_swap=1,purification_allowed=True,seed=seed)
     result = sim.run(sim_time_ms,policy=None)
     
-    delivered = []
+    delivered_pairs = []
     for p in sim.state.pairs.get(0,[]):
         record = DeliveredPair(request_id=-1,
                                delivered_at=p.born,
                                fidelity=p.f0,
                                consumed=1
                                )
-        delivered.append(record)
+        delivered_pairs.append(record)
 
+    summary = summarise(delivered_pairs,sim_time_ms)
+
+    return {
+        "rate": summary["rate"],
+        "mean_fidelity": summary["mean_fidelity"]
+    }
     
 
 
-    # raise NotImplementedError("TODO: implement run_one_hop")
 
 
 def run_two_hop(params, sim_time_ms, seed) -> dict:
