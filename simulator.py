@@ -8,11 +8,10 @@ Only numpy + standard library + qnetsim may be used.
 """
 
 import math
-
 import numpy as np
 
 from qnetsim import Link, Simulator, summarise,DeliveredPair
-
+from policy import BaselinePolicy
 
 # ---------------------------------------------------------------- helpers
 
@@ -107,6 +106,7 @@ def run_one_hop(params, sim_time_ms, seed) -> dict:
 
 
 def run_two_hop(params, sim_time_ms, seed) -> dict:
+
     """Reference scenario: two links, one repeater, immediate swap,
     T2 = infinity, q_swap = 1 (params['reference']['two_hop']).
     Return {"rate": ..., "mean_fidelity": ...}.
@@ -115,7 +115,25 @@ def run_two_hop(params, sim_time_ms, seed) -> dict:
     q_swap=1.0, f_swap=params['physics']['f_swap']; use a policy that swaps
     as soon as both links hold a pair; summarise with qnetsim.summarise.
     """
-    raise NotImplementedError("TODO: implement run_two_hop")
+    
+    class ImmediateSwapPolicy:
+        def on_pair_ready(self,link,pair,state,sim):
+            if state.pairs.get(0) and state.pairs.get(1):
+                sim.swap(0,1)
+    
+    
+    links = make_links(params=params,which="two_hop")
+    sim = Simulator(links=links,t2=math.inf,q_swap=1.0,f_swap=params['physics']['f_swap'],purification_allowed=False,seed=seed)
+    delivered_pairs = sim.run(sim_time_ms,policy=ImmediateSwapPolicy())
+    
+    summary = summarise(delivered_pairs,sim_time_ms)
+    return {
+        "rate": summary["rate"],
+        "mean_fidelity": summary["mean_fidelity"]
+    }
+
+
+    # raise NotImplementedError("TODO: implement run_two_hop")
 
 
 def run_variant_scenario(params, sim_time_ms, seed, policy) -> dict:
@@ -134,4 +152,43 @@ def run_variant_scenario(params, sim_time_ms, seed, policy) -> dict:
       * return the four metrics. pairs_consumed_per_delivery =
         stats['generated'] / max(1, delivered).
     """
-    raise NotImplementedError("TODO: implement run_variant_scenario")
+
+    phys = params["physics"]
+    links = make_links(params, which="variant")
+
+    sim = Simulator(
+        links=links,
+        t2=phys["t2_ms"],
+        q_swap=phys["q_swap"],
+        f_swap=phys["f_swap"],
+        purification_allowed=phys["purification_allowed"],
+        seed=seed,
+    )
+    deliveries = sim.run(sim_time_ms, policy=policy)
+    s = summarise(deliveries, sim_time_ms)
+
+    delivery_times = sorted(d.delivered_at for d in deliveries)
+    req_times = request_times(params, sim_time_ms, seed)
+
+    latencies = sorted(
+        max(0.0, del_time - req_time)
+        for req_time, del_time in zip(req_times, delivery_times)
+    )
+    if latencies:
+        p95_idx = min(len(latencies) - 1, int(math.ceil(0.95 * len(latencies))) - 1)
+        p95_latency_ms = float(latencies[p95_idx])
+    else:
+        p95_latency_ms = float("inf")
+
+    pairs_consumed_per_delivery = sim.state.stats["generated"] / max(1, len(deliveries))
+    return {
+        "rate": s["rate"],
+        "mean_fidelity": s["mean_fidelity"],
+        "p95_latency_ms": p95_latency_ms,
+        "pairs_consumed_per_delivery": pairs_consumed_per_delivery,
+    }
+
+
+
+
+    # raise NotImplementedError("TODO: implement run_variant_scenario")

@@ -32,7 +32,25 @@ class BaselinePolicy:
                 sim.swap(left, right)
 
 
+
+class LifoSwapPolicy:
+
+    def __init__(self, params):
+        self.params = params
+        self.chains = params["policy"]["swap_chains"]
+
+    def on_pair_ready(self, link, pair, state, sim):
+        for left,right in self.chains:
+            left_buf = state.pairs.get(left)
+            right_buf = state.pairs.get(right)
+
+            if left_buf and right_buf:
+                left_buf.insert(0, left_buf.pop())
+                right_buf.insert(0, right_buf.pop())
+                sim.swap(left,right)
+
+
 def make_policy(params):
     """Return your policy object. Replace BaselinePolicy with your own class
     (same constructor signature and on_pair_ready hook)."""
-    return BaselinePolicy(params)
+    return LifoSwapPolicy(params)
